@@ -13,7 +13,7 @@
 #include <vscript>
 #include <morecolors>
 
-#define PLUGIN_VERSION	"1.5.0"
+#define PLUGIN_VERSION	"1.5.2"
 
 ConVar sm_chaos_enabled;
 ConVar sm_chaos_effect_cooldown;
@@ -113,7 +113,7 @@ public void OnPluginStart()
 	sm_chaos_enabled = CreateConVar("sm_chaos_enabled", "1", "Enable or disable the plugin.");
 	sm_chaos_enabled.AddChangeHook(ConVarChanged_ChaosEnable);
 	sm_chaos_effect_cooldown = CreateConVar("sm_chaos_effect_cooldown", "50", "Default cooldown between effects.");
-	sm_chaos_effect_interval = CreateConVar("sm_chaos_effect_interval", "45", "Interval between each effect activation, in seconds.");
+	sm_chaos_effect_interval = CreateConVar("sm_chaos_effect_interval", "30", "Interval between each effect activation, in seconds.");
 	sm_chaos_meta_effect_interval = CreateConVar("sm_chaos_meta_effect_interval", "40", "Interval between each attempted meta effect activation, in seconds.");
 	sm_chaos_meta_effect_chance = CreateConVar("sm_chaos_meta_effect_chance", ".025", "Chance for a meta effect to be activated every interval, in percent.");
 	sm_chaos_effect_update_interval = CreateConVar("sm_chaos_effect_update_interval", ".1", "Interval at which effect update functions should be called, in seconds.");
@@ -125,14 +125,6 @@ public void OnPluginStart()
 	g_hTimerBarHudSync = CreateHudSynchronizer();
 	
 	Events_Initialize();
-	
-	GameData hGameConf = new GameData("chaos");
-	if (!hGameConf)
-		LogError("Failed to find chaos gamedata");
-	
-	Data_Initialize(hGameConf);
-	
-	delete hGameConf;
 }
 
 public void OnPluginEnd()
@@ -146,6 +138,18 @@ public void OnMapStart()
 	
 	// Initialize VScript system
 	ServerCommand("script_execute %s", "chaos");
+	
+	// Initialize all effects
+	GameData hGameConf = new GameData("chaos");
+	if (hGameConf)
+	{
+		Data_Initialize(hGameConf);
+		delete hGameConf;
+	}
+	else
+	{
+		LogError("Failed to find chaos gamedata");
+	}
 	
 	int nLength = g_hEffects.Length;
 	for (int i = 0; i < nLength; i++)
@@ -736,7 +740,15 @@ bool ActivateEffectById(const char[] szEffectId, bool bForce = false)
 	char szName[64];
 	if (effect.GetName(szName, sizeof(szName)) && szName[0])
 	{
-		CPrintToChatAll("%s %t", PLUGIN_TAG, "#Chaos_Effect_Activated", szName);
+		for (int client = 1; client <= MaxClients; client++)
+		{
+			if (!IsClientInGame(client))
+				continue;
+			
+			char szMessage[256];
+			Format(szMessage, sizeof(szMessage), "%t", "#Chaos_Effect_Activated", szName, client);
+			SendCustomHudNotificationCustom(client, szMessage, "ico_notify_flag_moving_alt");
+		}
 	}
 	
 	// For effects that need to access modified properties
@@ -1050,6 +1062,9 @@ static void ConVarChanged_ChaosEnable(ConVar convar, const char[] oldValue, cons
 
 static Action ConCmd_SetNextEffect(int client, int args)
 {
+	if (!g_bEnabled)
+		return Plugin_Continue;
+	
 	if (args < 1)
 	{
 		ReplyToCommand(client, "[SM] Usage: sm_chaos_setnexteffect <id>");
@@ -1077,6 +1092,9 @@ static Action ConCmd_SetNextEffect(int client, int args)
 
 static Action ConCmd_ForceEffect(int client, int args)
 {
+	if (!g_bEnabled)
+		return Plugin_Continue;
+	
 	if (args < 1)
 	{
 		ReplyToCommand(client, "[SM] Usage: sm_chaos_forceeffect <id>");

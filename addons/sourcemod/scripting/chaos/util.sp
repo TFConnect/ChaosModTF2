@@ -111,6 +111,15 @@ void SendHudNotification(HudNotification_t iType, bool bForceShow = false)
 	EndMessage();
 }
 
+void SendCustomHudNotificationCustom(int client, const char[] szText, const char[] szIcon, TFTeam nTeam = TFTeam_Unassigned)
+{
+	BfWrite bf = UserMessageToBfWrite(StartMessageOne("HudNotifyCustom", client));
+	bf.WriteString(szText);
+	bf.WriteString(szIcon);
+	bf.WriteByte(view_as<int>(nTeam));
+	EndMessage();
+}
+
 void PrintKeyHintText(int client, const char[] format, any...)
 {
 	char buffer[256];
